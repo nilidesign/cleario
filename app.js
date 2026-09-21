@@ -22,7 +22,7 @@
       if (/^[•●▪◦*\-]\s+/.test(text)) { type = 'li'; text = text.replace(/^[•●▪◦*\-]\s+/, ''); }
       items.push({ text, type });
     };
-    if (isRich || /<\/?(?:p|div|h[1-6]|ul|ol|li|span|br|table|strong|b|script|style)\b[^>]*>/i.test(source)) {
+    if (isRich || /<\/?[a-z][a-z0-9:-]*\b[^>]*>/i.test(source)) {
       // Inert template: content is never attached; output is rebuilt from escaped text only.
       const template = document.createElement('template');
       template.innerHTML = source;
