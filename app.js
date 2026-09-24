@@ -49,13 +49,15 @@
             flush();
             let type = 'p';
             const style = child.getAttribute('style') || '';
-            const list = child.tagName === 'LI' || /mso-list\s*:/i.test(style) || child.hasAttribute('data-listid');
+            // Word marks a list item on the item itself, or only on its wrapper.
+            // aria-level is no help: it numbers list levels as well as headings.
+            const list = child.tagName === 'LI' || /mso-list\s*:/i.test(style)
+              || ['data-listid', 'data-leveltext', 'data-list-defn-props'].some(a => child.hasAttribute(a))
+              || (child.tagName === 'P' && !!child.closest('.ListContainerWrapper'));
             const word = ((child.className || '') + ' ' + style + ' ' + paraStyle(child)).match(/(?:MsoHeading|heading\s*|outline-level\s*:\s*)([1-6])/i);
-            const aria = child.tagName === 'P' && (child.getAttribute('aria-level') || '');
             if (/^H[1-6]$/.test(child.tagName)) type = 'h' + Math.min(4, Math.max(2, +child.tagName[1]));
             else if (list) type = 'li';
             else if (word) type = 'h' + Math.min(4, +word[1] + 1);
-            else if (/^[1-6]$/.test(aria)) type = 'h' + Math.min(4, +aria + 1);
             walk(child, type);
           } else if (child.tagName === 'TD' || child.tagName === 'TH') buffer += child.textContent + ' ';
           else if (child.tagName === 'PRE') buffer += child.textContent.replace(/\n/g, '\u0001');
