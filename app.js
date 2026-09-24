@@ -28,23 +28,37 @@
       template.innerHTML = source;
       template.content.querySelectorAll('script,style,iframe,object,embed,template,svg,math,head,title,meta,link,noscript,[hidden]').forEach(e => e.remove());
       const blockTags = /^(P|DIV|H[1-6]|LI|UL|OL|SECTION|ARTICLE|BLOCKQUOTE|TR|TABLE|TBODY|THEAD|FOOTER|HEADER)$/;
+      // Word for the web keeps its paragraph style on a nested span, not on the block.
+      // Ignored for wrappers, so a container never inherits a child's heading style.
+      const paraStyle = el => {
+        if (el.querySelector('p,div,li,ul,ol,h1,h2,h3,h4,h5,h6,table')) return '';
+        const node = el.matches('[data-ccp-parastyle]') ? el : el.querySelector('[data-ccp-parastyle]');
+        return node ? node.getAttribute('data-ccp-parastyle') : '';
+      };
+      // Editors pretty-print their markup, so inline runs are often separated by
+      // newlines. In HTML those are whitespace; only BR and PRE may break a line.
       function walk(parent, inherited = 'p') {
         let buffer = '';
-        const flush = () => { add(buffer, inherited); buffer = ''; };
+        const flush = () => { add(buffer.replace(/\n/g, ' ').replace(/\u0001/g, '\n'), inherited); buffer = ''; };
         for (const child of parent.childNodes) {
           if (child.nodeType === 3) { buffer += child.textContent; continue; }
           if (child.nodeType !== 1) continue;
           if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(child.getAttribute('style') || '')) continue;
-          if (child.tagName === 'BR') { buffer += '\n'; continue; }
+          if (child.tagName === 'BR') { buffer += '\u0001'; continue; }
           if (blockTags.test(child.tagName)) {
             flush();
             let type = 'p';
-            const word = ((child.className || '') + ' ' + (child.getAttribute('style') || '')).match(/(?:MsoHeading|heading\s*|outline-level\s*:\s*)([1-6])/i);
+            const style = child.getAttribute('style') || '';
+            const list = child.tagName === 'LI' || /mso-list\s*:/i.test(style) || child.hasAttribute('data-listid');
+            const word = ((child.className || '') + ' ' + style + ' ' + paraStyle(child)).match(/(?:MsoHeading|heading\s*|outline-level\s*:\s*)([1-6])/i);
+            const aria = child.tagName === 'P' && (child.getAttribute('aria-level') || '');
             if (/^H[1-6]$/.test(child.tagName)) type = 'h' + Math.min(4, Math.max(2, +child.tagName[1]));
+            else if (list) type = 'li';
             else if (word) type = 'h' + Math.min(4, +word[1] + 1);
-            else if (child.tagName === 'LI' || /mso-list\s*:/i.test(child.getAttribute('style') || '')) type = 'li';
+            else if (/^[1-6]$/.test(aria)) type = 'h' + Math.min(4, +aria + 1);
             walk(child, type);
           } else if (child.tagName === 'TD' || child.tagName === 'TH') buffer += child.textContent + ' ';
+          else if (child.tagName === 'PRE') buffer += child.textContent.replace(/\n/g, '\u0001');
           else buffer += child.textContent;
         }
         flush();
